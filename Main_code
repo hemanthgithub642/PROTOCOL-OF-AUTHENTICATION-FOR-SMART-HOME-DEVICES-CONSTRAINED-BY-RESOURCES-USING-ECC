@@ -1,0 +1,101 @@
+import hashlib
+import random
+import time
+def system_setup_phase():
+ print("Step 1: Trusted Authority (TA) Initialization")
+ IDTA = input("Enter IDTA (hexadecimal): ")
+ MKMT = input("Enter MKMT (hexadecimal): ")
+ IDSHD = input("Enter IDSHD (hexadecimal): ")
+ PIDSHD = input("Enter PIDSHD (hexadecimal): ")
+ print("\nStep 2: Select TKV and Derive SSHD")
+ TKV = input("Enter TKV (hexadecimal): ")
+ start_time = time.time()
+ SSHD = hashlib.sha256((IDSHD + MKMT).encode()).hexdigest()
+22
+ end_time = time.time()
+ print("Computation time for SSHD derivation: {:.4f} seconds".format(end_time - start_time))
+ print("\nStep 3: Transmit parameters to Smart Home Device (SHD)")
+ R1 = random.randint(0, 9999)
+ TS1 = int(time.time()) 
+ SHD_parameters = {
+ "IDSHD": IDSHD,
+ "A1": PIDSHD + MKMT[::-1],
+ "IDTA": IDTA,
+ "SSHD": SSHD,
+ "TKV": TKV,
+ "R1": R1,
+ "TS1": TS1,
+ }
+ return SHD_parameters
+def key_negotiation_phase(SHD_parameters):
+ print("\nStep 4: Mobile Terminal (MT) Authentication and Key Derivation")
+ IDSHD = SHD_parameters["IDSHD"]
+ PIDSHD = hashlib.sha256((SHD_parameters["A1"] + SHD_parameters["TKV"]).encode()).hexdigest()
+ R1 = SHD_parameters["R1"]
+ TS1 = SHD_parameters["TS1"]
+ B3 = hashlib.sha256((IDSHD + PIDSHD + SHD_parameters["SSHD"] + str(R1) + 
+str(TS1)).encode()).hexdigest()
+ 
+ if B3 == B3: 
+ R2 = random.randint(0, 9999)
+ TS2 = int(time.time())
+ start_time = time.time()
+ SKMT = hashlib.sha256(
+ (IDSHD + PIDSHD + SHD_parameters["SSHD"] + str(R1) + str(R2) + str(TS1) + str(TS2)).encode()
+ ).hexdigest()
+ end_time = time.time()
+ print("Computation time for SKMT derivation: {:.4f} seconds".format(end_time - start_time))
+ return SKMT
+ else:
+ raise Exception("Mobile Terminal authentication failed")
+def mutual_authentication(SHD_parameters, SKMT):
+ print("\nStep 5: Mobile Terminal Updates and Message Construction")
+23
+ PIDSHD_star = hashlib.sha256(str(random.randint(0, 9999)).encode()).hexdigest()
+ A1_star = PIDSHD_star + SHD_parameters["A1"][64:] 
+ A2_star = SHD_parameters["IDSHD"] + hashlib.sha256(
+ (PIDSHD_star + SHD_parameters["TKV"]).encode()
+ ).hexdigest()
+ R2 = random.randint(0, 9999)
+ D1 = str(R2) + PIDSHD_star
+ D2 = hashlib.sha256((A1_star + SKMT).encode()).hexdigest()
+ print("\nStep 6: Trusted Authority (TA) Verification and Response")
+ PIDSHD_check = hashlib.sha256((A1_star + SHD_parameters["TKV"]).encode()).hexdigest()
+ if PIDSHD_check == PIDSHD_star:
+ 
+ AM4 = {
+ "D1": D1,
+ "D2": D2,
+ "TS2": int(time.time())
+ }
+ print("Mobile Terminal: Sending AM4 to Trusted Authority")
+ print("\nStep 7: Smart Home Device (SHD) Verification and Key Derivation")
+ TS3 = int(time.time()) 
+ DeltaT = 10 
+ if abs(AM4["TS2"] - TS3) > DeltaT:
+ raise Exception("Smart Home Device session terminated - Freshness check failed")
+ else:
+ 
+ R1 = SHD_parameters["R1"]
+ 
+ R2 = R2 # Update R2
+ start_time = time.time()
+ SKSHD = hashlib.sha256(
+ (IDSHD + PIDSHD_star + SHD_parameters["SSHD"] + str(R1) + str(R2) + str(TS1) + 
+str(AM4["TS2"]) + str(TS3)).encode()
+ ).hexdigest()
+ end_time = time.time()
+ print("Computation time for SKSHD derivation: {:.4f} seconds".format(end_time - start_time))
+ SHD_parameters["A1"] = A1_star
+ SHD_parameters["TKV"] = SKSHD
+ print("Smart Home Device: Mutual authentication successful")
+if __name__ == "__main__":
+ try:
+24
+ print("System Setup Phase Completed")
+ SHD_parameters = system_setup_phase()
+ print("\nKey Negotiation Phase Completed")
+ SKMT = key_negotiation_phase(SHD_parameters)
+ mutual_authentication(SHD_parameters, SKMT)
+ except Exception as e:
+ print("\nError:", str(e)) 

@@ -1,0 +1,47 @@
+#include <Arduino.h>
+// Elliptic Curve parameters (for demonstration purposes)
+const uint32_t a = 2;
+const uint32_t b = 3;
+const uint32_t p = 17; // Field size
+const uint32_t Gx = 5; // Generator point x-coordinate
+const uint32_t Gy = 1; // Generator point y-coordinate
+const uint32_t n = 19; // Order of the generator point
+// Private key (for demonstration purposes)
+const uint32_t private Key = 7;
+void setup() {
+ Serial.begin(9600);
+}
+void loop() {
+ String message = "Hello from board 1!";
+ 
+ // Calculate the public key
+ uint32_t publicKeyX, publicKeyY;
+ calculatePublicKey(privateKey, &publicKeyX, &publicKeyY);
+ uint32_t r, s;
+ sign(message, privateKey, &r, &s);
+ // Send the public key, r, and s over serial
+ Serial.print("PKX:");
+ Serial.println(publicKeyX);
+ Serial.print("PKY:");
+ Serial.println(publicKeyY);
+ Serial.print("R:");
+ Serial.println(r);
+ Serial.print("S:");
+ Serial.println(s);
+ delay(1000); // Wait for a second
+}
+void calculatePublicKey(uint32_t privateKey, uint32_t* publicKeyX, uint32_t* publicKeyY) {
+ *publicKeyX = (Gx * privateKey) % p;
+ *publicKeyY = (Gy * privateKey) % p;
+}
+void sign(String message, uint32_t privateKey, uint32_t* r, uint32_t* s) {
+*r = (Gx * privateKey) % n;
+ *s = (hash(message) + (*r * privateKey)) % n;
+}
+uint32_t hash(String message) {
+ uint32_t hashValue = 0;
+ for (int i = 0; i < message.length(); i++) {
+ hashValue += message[i];
+ }
+ return hashValue;
+}
